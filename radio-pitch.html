@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="lovelee radio">
+  <title>lovelee radio</title>
+  <style>
+    :root {
+      --purple: #7c3aed;
+      --bg: #080808;
+      --surface: #141414;
+      --border: #2a2a2a;
+      --text: #f0f0f0;
+      --muted: #777;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100svh;
+      height: -webkit-fill-available;
+      overflow: hidden;
+    }
+
+    .screen {
+      display: none;
+      flex-direction: column;
+      height: 100svh;
+      height: -webkit-fill-available;
+      padding: calc(var(--safe-top) + 20px) 24px calc(var(--safe-bottom) + 24px);
+      overflow-y: auto;
+    }
+    .screen.active { display: flex; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 40px;
+      flex-shrink: 0;
+    }
+
+    .logo { font-size: 20px; font-style: italic; font-weight: 300; letter-spacing: -0.3px; }
+
+    .icon-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px 0 4px 8px;
+      line-height: 1;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      border: none;
+      border-radius: 14px;
+      padding: 18px 24px;
+      font-size: 17px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity 0.12s;
+      flex-shrink: 0;
+      text-align: center;
+      text-decoration: none;
+      display: block;
+    }
+    .btn:active { opacity: 0.75; }
+    .btn-primary { background: var(--purple); color: #fff; }
+    .btn-ghost { background: var(--surface); color: var(--text); border: 1px solid var(--border); font-weight: 500; }
+
+    /* ── Setup ── */
+    #screen-setup .body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 20px;
+    }
+    .setup-title { font-size: 26px; font-weight: 700; line-height: 1.2; }
+    .setup-sub { color: var(--muted); font-size: 15px; line-height: 1.6; }
+
+    .field-wrap { display: flex; flex-direction: column; gap: 7px; }
+    .field-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+    .text-input, .field-input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 14px 16px;
+      color: var(--text);
+      font-size: 15px;
+      width: 100%;
+      outline: none;
+      -webkit-appearance: none;
+      font-family: inherit;
+    }
+    .text-input { font-family: 'SF Mono', 'Menlo', monospace; }
+    textarea.field-input { min-height: 260px; line-height: 1.5; resize: vertical; }
+    .text-input:focus, .field-input:focus { border-color: var(--purple); }
+
+    /* ── Main ── */
+    #screen-main .body {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .upload-zone {
+      width: 100%;
+      background: var(--surface);
+      border: 2px dashed var(--border);
+      border-radius: 24px;
+      padding: 64px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .upload-zone:active { border-color: var(--purple); background: #1a1020; }
+    .upload-icon { font-size: 52px; margin-bottom: 4px; }
+    .upload-title { font-size: 20px; font-weight: 600; }
+    .upload-sub { color: var(--muted); font-size: 14px; text-align: center; line-height: 1.5; }
+    #file-input { display: none; }
+
+    /* ── Loading ── */
+    #screen-loading .body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+    }
+    .spinner {
+      width: 44px; height: 44px;
+      border: 3px solid var(--border);
+      border-top-color: var(--purple);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: var(--muted); font-size: 16px; }
+
+    /* ── Review ── */
+    #screen-review { gap: 12px; }
+    #screen-review header { margin-bottom: 16px; }
+    .preview-img {
+      width: 100%;
+      max-height: 140px;
+      object-fit: contain;
+      border-radius: 12px;
+      flex-shrink: 0;
+      background: var(--surface);
+    }
+    .station-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 14px;
+      line-height: 1.5;
+      flex-shrink: 0;
+    }
+    .station-name { font-size: 17px; font-weight: 600; }
+    .station-meta { color: var(--muted); margin-top: 4px; }
+    .station-meta a { color: #a78bfa; word-break: break-all; }
+    .fields { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+    .review-actions { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; flex-shrink: 0; }
+    .hint { color: var(--muted); font-size: 13px; text-align: center; line-height: 1.5; }
+
+    /* ── Error banner ── */
+    .error-banner {
+      background: #2a0f0f;
+      border: 1px solid #5c1f1f;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 14px;
+      color: #fca5a5;
+      display: none;
+    }
+    .error-banner.show { display: block; }
+  </style>
+</head>
+<body>
+
+<!-- SETUP -->
+<div class="screen active" id="screen-setup">
+  <header><span class="logo">lovelee radio</span></header>
+  <div class="body">
+    <div>
+      <div class="setup-title">One-time setup</div>
+      <div class="setup-sub" style="margin-top:8px">Both values stay on this device only.</div>
+    </div>
+    <div class="field-wrap">
+      <div class="field-label">Anthropic API Key</div>
+      <input type="password" class="text-input" id="api-key-input" placeholder="sk-ant-..." autocomplete="off" autocorrect="off" autocapitalize="off">
+    </div>
+    <div class="field-wrap">
+      <div class="field-label">Drafts Script URL (mgmt@)</div>
+      <input type="password" class="text-input" id="script-url-input" placeholder="https://script.google.com/macros/s/..." autocomplete="off" autocorrect="off" autocapitalize="off">
+    </div>
+    <div class="error-banner" id="setup-error"></div>
+    <button class="btn btn-primary" onclick="saveKey()">Save &amp; Continue</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="screen" id="screen-main">
+  <header>
+    <span class="logo">lovelee radio</span>
+    <button class="icon-btn" onclick="showSetup()" title="Change API key">⚙</button>
+  </header>
+  <div class="body">
+    <div class="upload-zone" onclick="document.getElementById('file-input').click()">
+      <div class="upload-icon">📻</div>
+      <div class="upload-title">Pitch a radio</div>
+      <div class="upload-sub">Tap to pick a screenshot of a<br>radio show asking for submissions</div>
+    </div>
+    <input type="file" id="file-input" accept="image/*" onchange="handleFile(event)">
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="screen" id="screen-loading">
+  <header><span class="logo">lovelee radio</span></header>
+  <div class="body">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text">Reading screenshot...</div>
+  </div>
+</div>
+
+<!-- REVIEW -->
+<div class="screen" id="screen-review">
+  <header>
+    <span class="logo">lovelee radio</span>
+    <button class="icon-btn" onclick="showMain()">✕</button>
+  </header>
+  <img class="preview-img" id="preview-img" src="" alt="">
+  <div class="station-card">
+    <div class="station-name" id="s-name"></div>
+    <div class="station-meta" id="s-meta"></div>
+  </div>
+  <div class="fields">
+    <div class="field-wrap">
+      <div class="field-label">To</div>
+      <input type="email" class="field-input" id="f-to" inputmode="email" autocapitalize="none" placeholder="No email found — submit via link above">
+    </div>
+    <div class="field-wrap">
+      <div class="field-label">Subject</div>
+      <input type="text" class="field-input" id="f-subject">
+    </div>
+    <div class="field-wrap">
+      <div class="field-label">Message</div>
+      <textarea class="field-input" id="f-body"></textarea>
+    </div>
+  </div>
+  <div class="review-actions">
+    <div class="error-banner" id="review-error"></div>
+    <button class="btn btn-primary" id="draft-btn" onclick="createDraft()">Create Gmail draft</button>
+    <button class="btn btn-ghost" id="copy-btn" onclick="copyPitch()">Copy message</button>
+    <button class="btn btn-ghost" id="log-btn" onclick="logPitch()">Pitched via DM / form? Log it</button>
+    <div class="hint">Draft lands in mgmt@itsloveleee.com with your signature &amp; EPK, and gets logged in the Radio Outreach sheet.<br>Nothing is sent until you hit send yourself.</div>
+  </div>
+</div>
+
+<script>
+// ── Artist info (edit here when the focus track or EPK changes) ──
+const ARTIST = {
+  sender:  'mgmt@itsloveleee.com',
+  song:    'Violet',
+  songUrl: 'https://drive.google.com/file/d/1NQYKbcYVhJavcOdqh1q0AdzaO43i_lMF/view'
+};
+
+// Lee's pitch, word for word. Only greeting, platform and station name change.
+function buildPitch(d) {
+  const greet    = d.host ? d.host.split(' ')[0] : (d.station ? d.station + ' team' : 'there');
+  const platform = d.platform || 'insta';
+  const station  = d.station || 'your show';
+  return {
+    subject: d.subject_format || `Submission: lovelee \u201E${ARTIST.song}\u201C`,
+    body:
+`Dear ${greet},
+
+I just saw your radio submissions post on ${platform} and, after checking out your curation, decided to email you:) my name is lovelee, a berlin based indie-pop artist. I think my upcoming song \u201E${ARTIST.song}\u201C would be a great fit for ${station}.
+
+${ARTIST.songUrl}
+
+Please let me know what you think, and thanks for considering!
+
+Sincerely,
+lee`
+  };
+}
+
+// ── Navigation ──────────────────────────────────────────────
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+function showMain() { show('main'); }
+function showSetup() { show('setup'); }
+
+// ── Key storage (shared with add-opportunity.html) ──────────
+const getKey = () => localStorage.getItem('lovelee_api_key');
+const getScriptUrl = () => localStorage.getItem('lovelee_radio_script_url');
+
+function saveKey() {
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key.startsWith('sk-ant-')) {
+    showError('setup-error', 'API key should start with sk-ant-');
+    return;
+  }
+  const url = document.getElementById('script-url-input').value.trim();
+  if (!url.startsWith('https://script.google.com/')) {
+    showError('setup-error', 'Script URL should start with https://script.google.com/');
+    return;
+  }
+  localStorage.setItem('lovelee_api_key', key);
+  localStorage.setItem('lovelee_radio_script_url', url);
+  showMain();
+}
+
+window.addEventListener('load', () => { if (getKey() && getScriptUrl()) showMain(); });
+
+// ── File pick ────────────────────────────────────────────────
+async function handleFile(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+
+  show('loading');
+  setLoading('Reading screenshot...');
+
+  try {
+    const { base64, dataUrl } = await resizeImage(file);
+    document.getElementById('preview-img').src = dataUrl;
+
+    setLoading('Writing your pitch...');
+    const pitch = await callClaude(base64);
+
+    fillForm(pitch);
+    show('review');
+  } catch (err) {
+    showMain();
+    alert('Something went wrong:\n' + err.message);
+  }
+}
+
+function setLoading(t) { document.getElementById('loading-text').textContent = t; }
+
+// ── Image resize ─────────────────────────────────────────────
+function resizeImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1280;
+        let { width: w, height: h } = img;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = c.toDataURL('image/jpeg', 0.85);
+        resolve({ base64: dataUrl.split(',')[1], dataUrl });
+      };
+      img.onerror = reject;
+      img.src = ev.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ── Claude API ───────────────────────────────────────────────
+async function callClaude(base64) {
+  const key = getKey();
+  if (!key) throw new Error('No API key saved');
+
+  const prompt = `The screenshot is a radio station, show or DJ asking artists for music submissions.
+Read it and return ONLY valid JSON, no markdown:
+{
+  "station": "station or show name as they write it",
+  "host": "host's name if visible, else empty string",
+  "platform": "where the post is from: insta, tiktok, facebook, website, etc. Use 'insta' for Instagram",
+  "email": "submission email if visible, else empty string",
+  "submit_via": "how to submit if not by email (DM, form URL, website), else empty string",
+  "deadline": "deadline if visible, else empty string",
+  "requirements": "one short line of requirements from the post, else empty string",
+  "subject_format": "only if the post asks for a specific email subject, write it filled in for the artist lovelee and the song ${ARTIST.song}; else empty string"
+}`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 600,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+          { type: 'text', text: prompt }
+        ]
+      }]
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || 'Claude API error ' + res.status);
+  }
+
+  const data = await res.json();
+  const text = (data.content?.[0]?.text || '').replace(/```json?\n?/g, '').replace(/```/g, '').trim();
+  return JSON.parse(text);
+}
+
+// ── Form ──────────────────────────────────────────────────────
+let current = {};
+
+function fillForm(d) {
+  document.getElementById('s-name').textContent = d.station || 'Radio submission';
+  const meta = document.getElementById('s-meta');
+  meta.innerHTML = '';
+  const lines = [
+    d.host && 'Host: ' + d.host,
+    d.deadline && 'Deadline: ' + d.deadline,
+    d.requirements,
+    d.submit_via && 'Submit via: ' + d.submit_via
+  ].filter(Boolean);
+  lines.forEach(l => {
+    const div = document.createElement('div');
+    const url = l.match(/https?:\/\/\S+/);
+    if (url) {
+      div.append(l.slice(0, url.index));
+      const a = document.createElement('a');
+      a.href = url[0]; a.target = '_blank'; a.textContent = url[0];
+      div.append(a);
+    } else {
+      div.textContent = l;
+    }
+    meta.append(div);
+  });
+  if (!lines.length) meta.textContent = 'No extra details found in the screenshot.';
+
+
+  current = d;
+  const pitch = buildPitch(d);
+  document.getElementById('f-to').value      = d.email || '';
+  document.getElementById('f-subject').value = pitch.subject;
+  document.getElementById('f-body').value    = pitch.body;
+}
+
+const draft = () => ({
+  to:         document.getElementById('f-to').value.trim(),
+  subject:    document.getElementById('f-subject').value.trim(),
+  body:       document.getElementById('f-body').value,
+  station:    current.station || '',
+  host:       current.host || '',
+  submit_via: current.submit_via || '',
+  song:       ARTIST.song
+});
+
+// ── Create Gmail draft / log pitch via mgmt@ Apps Script (never sends) ──
+async function postToScript(action, btn, busyText) {
+  const d = { action, ...draft() };
+  if (action === 'draft' && (!d.subject || !d.body.trim())) { showError('review-error', 'Subject and message are required'); return null; }
+
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = busyText;
+  try {
+    // text/plain avoids a CORS preflight, which Apps Script can't answer
+    const res = await fetch(getScriptUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(d)
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Script returned an error');
+    if (data.previous?.length) alert('Heads up: you pitched them before\n' + data.previous.join('\n'));
+    return data;
+  } catch (err) {
+    showError('review-error', 'Failed: ' + err.message);
+    return null;
+  } finally {
+    setTimeout(() => { btn.disabled = false; btn.textContent = label; }, 2500);
+  }
+}
+
+async function createDraft() {
+  const btn = document.getElementById('draft-btn');
+  const data = await postToScript('draft', btn, 'Creating draft...');
+  if (!data) return;
+  btn.textContent = 'Draft created ✓';
+  // Open the drafts folder; the new draft is at the top
+  window.open('https://mail.google.com/mail/?authuser=' + encodeURIComponent(ARTIST.sender) + '#drafts', '_blank');
+}
+
+async function logPitch() {
+  const btn = document.getElementById('log-btn');
+  const data = await postToScript('log', btn, 'Logging...');
+  if (data) btn.textContent = 'Logged ✓';
+}
+
+async function copyPitch() {
+  try {
+    await navigator.clipboard.writeText(draft().body);
+    const b = document.getElementById('copy-btn');
+    b.textContent = 'Copied ✓';
+    setTimeout(() => b.textContent = 'Copy message', 1500);
+  } catch {
+    showError('review-error', 'Copy failed. Select the text and copy manually.');
+  }
+}
+
+// ── Error helper ──────────────────────────────────────────────
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 5000);
+}
+</script>
+</body>
+</html>
