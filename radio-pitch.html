@@ -178,6 +178,9 @@
     .station-name { font-size: 17px; font-weight: 600; }
     .station-meta { color: var(--muted); margin-top: 4px; }
     .station-meta a { color: #a78bfa; word-break: break-all; }
+    .toggles { display: flex; gap: 18px; font-size: 14px; color: var(--text); flex-wrap: wrap; }
+    .toggles label { display: flex; align-items: center; gap: 8px; }
+    .toggles input { width: 18px; height: 18px; accent-color: var(--purple); }
     .fields { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
     .review-actions { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; flex-shrink: 0; }
     .hint { color: var(--muted); font-size: 13px; text-align: center; line-height: 1.5; }
@@ -263,6 +266,10 @@
       <div class="field-label">Subject</div>
       <input type="text" class="field-input" id="f-subject">
     </div>
+    <div class="toggles">
+      <label><input type="checkbox" id="opt-streaming" onchange="rebuildBody()"> Streaming links</label>
+      <label><input type="checkbox" id="opt-shows" onchange="rebuildBody()"> Upcoming shows</label>
+    </div>
     <div class="field-wrap">
       <div class="field-label">Message</div>
       <textarea class="field-input" id="f-body"></textarea>
@@ -282,22 +289,65 @@
 const ARTIST = {
   sender:  'mgmt@itsloveleee.com',
   song:    'Violet',
-  songUrl: 'https://drive.google.com/file/d/1NQYKbcYVhJavcOdqh1q0AdzaO43i_lMF/view'
+  songUrl: 'https://drive.google.com/file/d/1NQYKbcYVhJavcOdqh1q0AdzaO43i_lMF/view',
+  spotify: 'https://open.spotify.com/artist/0ulcfO2JDsDuhgfKPGuTVo',
+  apple:   'https://music.apple.com/de/artist/lovelee/1862171633?l=en-GB',
+  // "lovelee Shows" sheet, published as CSV (same feed the website uses)
+  showsCsv: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ7g26J6XtGA0irZqX7gpbFdDXDVIaXt5qsxk6FrX6L-8L46MeJlATxOEs2mB3pjM-hhKSZPFnB-JtY/pub?gid=116038247&single=true&output=csv'
 };
 
-// Lee's pitch, word for word. Only greeting, platform and station name change.
-function buildPitch(d) {
-  const greet    = d.host ? d.host.split(' ')[0] : (d.station ? d.station + ' team' : 'there');
+// "ISLINGTON RADIO" -> "Islington Radio"; keeps short/vowel-less words like THF, EP, TRGRS in caps
+function niceCase(str) {
+  if (!str || str !== str.toUpperCase()) return str || '';
+  return str.split(' ').map(w =>
+    (w.length <= 3 || !/[AEIOUY]/.test(w)) ? w : w[0] + w.slice(1).toLowerCase()
+  ).join(' ');
+}
+
+// Upcoming shows from the sheet, e.g. "Oct 17, THF Radio Berlin, Berlin"
+let upcomingShows = [];
+async function loadShows() {
+  try {
+    const csv = await (await fetch(ARTIST.showsCsv)).text();
+    const today = new Date().toISOString().slice(0, 10);
+    const thisYear = today.slice(0, 4);
+    upcomingShows = csv.trim().split('\n').slice(1)
+      .map(line => line.split(','))
+      .filter(([date]) => /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today)
+      .sort((x, y) => x[0].localeCompare(y[0]))
+      .map(([date, venue, city]) => {
+        const d = new Date(date + 'T12:00:00');
+        const when = d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }).split(' ').reverse().join(' ')
+          + (date.slice(0, 4) !== thisYear ? ' ' + date.slice(0, 4) : '');
+        return `${when}, ${niceCase(venue)}, ${city}`;
+      });
+  } catch (err) {
+    upcomingShows = [];
+  }
+}
+
+// Lee's pitch, word for word. Greeting, platform, station name and optional blocks change.
+function buildPitch(d, opts = {}) {
+  const station  = niceCase(d.station) || 'your show';
+  const greet    = d.host ? d.host.split(' ')[0] : (d.station ? station + ' team' : 'there');
   const platform = d.platform || 'insta';
-  const station  = d.station || 'your show';
+
+  let extras = '';
+  if (opts.streaming) extras += `\n\nStreaming:\nSpotify: ${ARTIST.spotify}\nApple Music: ${ARTIST.apple}`;
+  if (opts.shows) extras += upcomingShows.length
+    ? `\n\nUpcoming shows:\n${upcomingShows.join('\n')}`
+    : `\n\nUpcoming shows:\n[no upcoming shows in the sheet, add or remove this]`;
+
   return {
     subject: d.subject_format || `Submission: lovelee \u201E${ARTIST.song}\u201C`,
     body:
 `Dear ${greet},
 
-I just saw your radio submissions post on ${platform} and, after checking out your curation, decided to email you:) my name is lovelee, a berlin based indie-pop artist. I think my upcoming song \u201E${ARTIST.song}\u201C would be a great fit for ${station}.
+I just saw your radio submissions post on ${platform}. After checking out your curation, I decided I had to e-mail you!:)
 
-${ARTIST.songUrl}
+I'm lovelee, a Berlin based indie-pop artist, and I think my upcoming song \u201E${ARTIST.song}\u201C would be a great fit for ${station}.
+
+${ARTIST.songUrl}${extras}
 
 Please let me know what you think, and thanks for considering!
 
@@ -350,7 +400,7 @@ async function handleFile(e) {
     document.getElementById('preview-img').src = dataUrl;
 
     setLoading('Writing your pitch...');
-    const pitch = await callClaude(base64);
+    const [pitch] = await Promise.all([callClaude(base64), loadShows()]);
 
     fillForm(pitch);
     show('review');
@@ -397,13 +447,15 @@ async function callClaude(base64) {
   const prompt = `The screenshot is a radio station, show or DJ asking artists for music submissions.
 Read it and return ONLY valid JSON, no markdown:
 {
-  "station": "station or show name as they write it",
-  "host": "host's name if visible, else empty string",
+  "station": "station or show name, capitalised the way a person would type it in an email (e.g. 'Islington Radio', never ALL CAPS even if the post uses caps; keep real acronyms like BBC or THF)",
+  "host": "host's name if visible, normally capitalised (e.g. 'Sam'), else empty string",
   "platform": "where the post is from: insta, tiktok, facebook, website, etc. Use 'insta' for Instagram",
   "email": "submission email if visible, else empty string",
   "submit_via": "how to submit if not by email (DM, form URL, website), else empty string",
   "deadline": "deadline if visible, else empty string",
   "requirements": "one short line of requirements from the post, else empty string",
+  "wants_shows": true if the post asks artists to mention upcoming gigs, shows or tour dates, else false,
+  "wants_streaming": true if the post asks for streaming links, Spotify, Apple Music or socials, else false,
   "subject_format": "only if the post asks for a specific email subject, write it filled in for the artist lovelee and the song ${ARTIST.song}; else empty string"
 }`;
 
@@ -441,6 +493,16 @@ Read it and return ONLY valid JSON, no markdown:
 // ── Form ──────────────────────────────────────────────────────
 let current = {};
 
+const pitchOpts = () => ({
+  streaming: document.getElementById('opt-streaming').checked,
+  shows:     document.getElementById('opt-shows').checked
+});
+
+// Ticking a box rebuilds the message (manual edits to the message are replaced)
+function rebuildBody() {
+  document.getElementById('f-body').value = buildPitch(current, pitchOpts()).body;
+}
+
 function fillForm(d) {
   document.getElementById('s-name').textContent = d.station || 'Radio submission';
   const meta = document.getElementById('s-meta');
@@ -468,7 +530,9 @@ function fillForm(d) {
 
 
   current = d;
-  const pitch = buildPitch(d);
+  document.getElementById('opt-streaming').checked = !!d.wants_streaming;
+  document.getElementById('opt-shows').checked     = !!d.wants_shows;
+  const pitch = buildPitch(d, pitchOpts());
   document.getElementById('f-to').value      = d.email || '';
   document.getElementById('f-subject').value = pitch.subject;
   document.getElementById('f-body').value    = pitch.body;
