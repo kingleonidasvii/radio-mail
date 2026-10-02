@@ -277,7 +277,7 @@
   </div>
   <div class="review-actions">
     <div class="error-banner" id="review-error"></div>
-    <button class="btn btn-primary" id="draft-btn" onclick="createDraft()">Create Gmail draft</button>
+    <button class="btn btn-primary" id="draft-btn" onclick="createDraft()">Create draft &amp; open Gmail</button>
     <button class="btn btn-ghost" id="copy-btn" onclick="copyPitch()">Copy message</button>
     <button class="btn btn-ghost" id="log-btn" onclick="logPitch()">Pitched via DM / form? Log it</button>
     <div class="hint">Draft lands in mgmt@itsloveleee.com with your signature &amp; EPK, and gets logged in the Radio Outreach sheet.<br>Nothing is sent until you hit send yourself.</div>
@@ -580,8 +580,15 @@ async function createDraft() {
   const data = await postToScript('draft', btn, 'Creating draft...');
   if (!data) return;
   btn.textContent = 'Draft created ✓';
-  // Open the drafts folder; the new draft is at the top
-  window.open('https://mail.google.com/mail/?authuser=' + encodeURIComponent(ARTIST.sender) + '#drafts', '_blank');
+  const web = 'https://mail.google.com/mail/?authuser=' + encodeURIComponent(ARTIST.sender) + '#drafts';
+  if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+    // Open the Gmail app; fall back to Gmail web if the app didn't open
+    window.location.href = 'googlegmail://';
+    setTimeout(() => { if (!document.hidden) window.location.href = web; }, 1500);
+  } else {
+    // Open the drafts folder; the new draft is at the top
+    window.open(web, '_blank');
+  }
 }
 
 async function logPitch() {
